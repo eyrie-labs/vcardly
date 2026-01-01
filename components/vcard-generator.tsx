@@ -19,12 +19,45 @@ export function VCardGenerator() {
     jobTitle: "",
     website: "",
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
+
+  const maxLengths: Record<string, number> = {
+    firstName: 50,
+    lastName: 50,
+    phone: 20,
+    email: 100,
+    jobTitle: 100,
+    company: 100,
+    website: 200,
+  }
+
+  const validateField = (name: string, value: string) => {
+    const maxLen = maxLengths[name]
+    if (maxLen && value.length > maxLen) {
+      return `Maximum ${maxLen} characters`
+    }
+    switch (name) {
+      case "firstName":
+        return value.trim() ? "" : "First name is required"
+      case "phone":
+        if (!value) return ""
+        const phoneRegex = /^[\d\s\-\+\(\)]+$/
+        return phoneRegex.test(value) ? "" : "Invalid phone number"
+      case "email":
+        if (!value) return ""
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        return emailRegex.test(value) ? "" : "Invalid email address"
+      default:
+        return ""
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+    setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }))
   }
 
   const generateVCard = () => {
@@ -75,9 +108,10 @@ export function VCardGenerator() {
   const handleDownload = () => {
     if (!qrCodeUrl) return
 
+    const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9-_]/g, "").slice(0, 50)
     const link = document.createElement("a")
     link.href = qrCodeUrl
-    link.download = `vcard-qr-${formData.firstName}-${formData.lastName}.png`
+    link.download = `vcard-qr-${sanitize(formData.firstName)}-${sanitize(formData.lastName)}.png`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -101,7 +135,7 @@ export function VCardGenerator() {
         </div>
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent text-sm font-medium">
           <CheckCircle2 className="h-4 w-4" />
-          100% Free
+          Free to Use
         </div>
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent text-sm font-medium">
           <CheckCircle2 className="h-4 w-4" />
@@ -122,13 +156,15 @@ export function VCardGenerator() {
               value={formData.firstName}
               onChange={handleInputChange}
               placeholder="John"
-              className="h-11"
+              maxLength={50}
+              className={`h-11 ${errors.firstName ? "border-destructive" : ""}`}
             />
+            {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
           </div>
 
           <div className="space-y-2.5">
             <Label htmlFor="lastName" className="text-sm font-medium">
-              Last Name *
+              Last Name
             </Label>
             <Input
               id="lastName"
@@ -136,6 +172,7 @@ export function VCardGenerator() {
               value={formData.lastName}
               onChange={handleInputChange}
               placeholder="Doe"
+              maxLength={50}
               className="h-11"
             />
           </div>
@@ -151,8 +188,10 @@ export function VCardGenerator() {
               value={formData.phone}
               onChange={handleInputChange}
               placeholder="+1 (555) 123-4567"
-              className="h-11"
+              maxLength={20}
+              className={`h-11 ${errors.phone ? "border-destructive" : ""}`}
             />
+            {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
           </div>
 
           <div className="space-y-2.5">
@@ -166,8 +205,10 @@ export function VCardGenerator() {
               value={formData.email}
               onChange={handleInputChange}
               placeholder="john.doe@company.com"
-              className="h-11"
+              maxLength={100}
+              className={`h-11 ${errors.email ? "border-destructive" : ""}`}
             />
+            {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
           </div>
 
           <div className="space-y-2.5">
@@ -180,6 +221,7 @@ export function VCardGenerator() {
               value={formData.company}
               onChange={handleInputChange}
               placeholder="Acme Corporation"
+              maxLength={100}
               className="h-11"
             />
           </div>
@@ -194,6 +236,7 @@ export function VCardGenerator() {
               value={formData.jobTitle}
               onChange={handleInputChange}
               placeholder="Senior Product Manager"
+              maxLength={100}
               className="h-11"
             />
           </div>
@@ -209,6 +252,7 @@ export function VCardGenerator() {
               value={formData.website}
               onChange={handleInputChange}
               placeholder="https://www.company.com"
+              maxLength={200}
               className="h-11"
             />
           </div>
@@ -218,7 +262,7 @@ export function VCardGenerator() {
           onClick={handleGenerateQR}
           className="w-full h-12 text-base font-medium"
           size="lg"
-          disabled={isGenerating || (!formData.firstName && !formData.lastName)}
+          disabled={isGenerating || !formData.firstName || Object.values(errors).some(e => e)}
         >
           <QrCode className="mr-2 h-5 w-5" />
           {isGenerating ? "Generating QR Code..." : "Generate QR Code"}
