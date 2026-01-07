@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -43,11 +44,13 @@ export function VCardGenerator() {
         return value.trim() ? "" : "First name is required"
       case "phone":
         if (!value) return ""
-        const phoneRegex = /^[\d\s\-\+\(\)]+$/
+        const phoneRegex = /^\+?[\d\s\-\(\)]{7,20}$/
+        const digitCount = value.replace(/\D/g, "").length
+        if (digitCount < 7 || digitCount > 15) return "Phone must have 7-15 digits"
         return phoneRegex.test(value) ? "" : "Invalid phone number"
       case "email":
         if (!value) return ""
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
         return emailRegex.test(value) ? "" : "Invalid email address"
       default:
         return ""
@@ -60,17 +63,27 @@ export function VCardGenerator() {
     setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }))
   }
 
+  const sanitizeVCardField = (value: string) => {
+    return value
+      .replace(/\\/g, "\\\\")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,")
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "")
+  }
+
   const generateVCard = () => {
+    const s = sanitizeVCardField
     const vcard = [
       "BEGIN:VCARD",
       "VERSION:3.0",
-      `FN:${formData.firstName} ${formData.lastName}`,
-      `N:${formData.lastName};${formData.firstName};;;`,
-      formData.phone && `TEL:${formData.phone}`,
-      formData.email && `EMAIL:${formData.email}`,
-      formData.company && `ORG:${formData.company}`,
-      formData.jobTitle && `TITLE:${formData.jobTitle}`,
-      formData.website && `URL:${formData.website}`,
+      `FN:${s(formData.firstName)} ${s(formData.lastName)}`,
+      `N:${s(formData.lastName)};${s(formData.firstName)};;;`,
+      formData.phone && `TEL:${s(formData.phone)}`,
+      formData.email && `EMAIL:${s(formData.email)}`,
+      formData.company && `ORG:${s(formData.company)}`,
+      formData.jobTitle && `TITLE:${s(formData.jobTitle)}`,
+      formData.website && `URL:${s(formData.website)}`,
       "END:VCARD",
     ]
       .filter(Boolean)
@@ -96,10 +109,15 @@ export function VCardGenerator() {
         body: JSON.stringify({ vcard }),
       })
 
+      if (!response.ok) {
+        throw new Error("Failed to generate QR code")
+      }
+
       const data = await response.json()
       setQrCodeUrl(data.qrCode)
     } catch (error) {
-      console.error("[v0] Error generating QR code:", error)
+      console.error("Error generating QR code:", error)
+      toast.error("Failed to generate QR code. Please try again.")
     } finally {
       setIsGenerating(false)
     }
